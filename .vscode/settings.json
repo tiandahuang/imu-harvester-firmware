@@ -3,6 +3,17 @@
         "ble_nus.h": "c",
         "string.h": "c",
         "stdint.h": "c",
-        "nordic_common.h": "c"
+        "nordic_common.h": "c",
+        "app_debug.h": "c",
+        "nrf_log_default_backends.h": "c",
+        "nrf.h": "c",
+        "nrf_sdh_ble.h": "c",
+        "nrf_ble_gatt.h": "c",
+        "nrf_ble_qwr.h": "c",
+        "app_timer.h": "c",
+        "nrf_log.h": "c",
+        "nrf_log_ctrl.h": "c",
+        "sdk_common.h": "c",
+        "app_util_platform.h": "c"
     }
 }

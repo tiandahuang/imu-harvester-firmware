@@ -9,6 +9,7 @@
         {
             "name": "nRF5 SDK Common",
             "compilerPath": "${seggerCompilerPath}",
+            "forcedInclude": ["${workspaceFolder}/pca10056e/s112/config/sdk_config.h"],
             "includePath": [
                 "${workspaceFolder}/**",
                 "${seggerStdLibPath}",
@@ -128,6 +129,7 @@
                 "__ASM=__asm",
                 "__INLINE=inline",
                 "__STATIC_INLINE=static inline",
+                "VSCODE_EDITING",
                 "APP_TIMER_V2",
                 "APP_TIMER_V2_RTC1_ENABLE",
                 "BOARD_PCA10056",
