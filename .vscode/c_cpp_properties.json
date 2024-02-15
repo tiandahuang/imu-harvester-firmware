@@ -1,16 +1,18 @@
 {
     "env": {
-        "seggerCompilerPath": "C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 5.42a/gcc/arm-none-eabi/bin/cc1.exe"
+        "seggerVersion": "5.42a",
+        "seggerPath": "C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM ${seggerVersion}",
+        "seggerCompilerPath": "${seggerPath}/gcc/arm-none-eabi/bin/cc1.exe",
+        "seggerStdLibPath": "{env:LOCALAPPDATA}/SEGGER/SEGGER Embedded Studio/v3/packages/libraries"
     },
     "configurations": [
         {
             "name": "nRF5 SDK Common",
-            "compilerPath": "\"\"",
-            "compilerArgs": [
-                "-IC:/Users/Tienda/AppData/Local/SEGGER/SEGGER Embedded Studio/v3/packages/libraries/libcxx/include"
-            ],
+            "compilerPath": "${seggerCompilerPath}",
             "includePath": [
                 "${workspaceFolder}/**",
+                "${seggerStdLibPath}",
+                "${seggerPath}/include",
                 "${workspaceFolder}/../../../components",
                 "${workspaceFolder}/../../../components/ble/ble_advertising",
                 "${workspaceFolder}/../../../components/ble/ble_dtm",
@@ -120,6 +122,12 @@
                 "${workspaceFolder}/pca10056e/s112/config"
             ],
             "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "__ASM=__asm",
+                "__INLINE=inline",
+                "__STATIC_INLINE=static inline",
                 "APP_TIMER_V2",
                 "APP_TIMER_V2_RTC1_ENABLE",
                 "BOARD_PCA10056",
@@ -132,10 +140,11 @@
                 "NRFX_COREDEP_DELAY_US_LOOP_CYCLES=3",
                 "NRF_SD_BLE_API_VERSION=7",
                 "S112",
-                "SOFTDEVICE_PRESENT"
+                "SOFTDEVICE_PRESENT",
+                "USE_APP_CONFIG"
             ],
             "cStandard": "gnu99",
-            "intelliSenseMode": "windows-gcc-arm"
+            "intelliSenseMode": "${default}"
         }
     ],
     "version": 4

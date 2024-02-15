@@ -1,2 +1,8 @@
 {
+    "files.associations": {
+        "ble_nus.h": "c",
+        "string.h": "c",
+        "stdint.h": "c",
+        "nordic_common.h": "c"
+    }
 }
