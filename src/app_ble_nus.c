@@ -106,7 +106,7 @@ static void nus_data_handler(ble_nus_evt_t *p_evt) {
     if (p_evt->type == BLE_NUS_EVT_RX_DATA) {
         uint32_t err_code;
 
-        debug_log("Received data from BLE NUS. Writing data on UART.");
+        debug_log("Received data from BLE NUS:");
         for (uint32_t i = 0; i < p_evt->params.rx_data.length; i++) {
             debug_log("%02x ", p_evt->params.rx_data.p_data[i]);
         }
@@ -356,7 +356,12 @@ void advertising_start(void) {
 }
 
 void ble_all_services_init(void) {
-    if (ble_stack_init() || gap_params_init() || gatt_init() || services_init() || advertising_init() || conn_params_init()) {
+    if (    ble_stack_init()
+         || gap_params_init()
+         || gatt_init() 
+         || services_init() 
+         || advertising_init() 
+         || conn_params_init()) {
         APP_ERROR_CHECK(NRF_ERROR_INTERNAL);
     }
 }
@@ -372,7 +377,7 @@ void ble_send(void) {
     static int toggle = 0x0;
     toggle ^= 0x1;
     char *data_array = toggle ? hello : world;
-    debug_log("msg: %s", data_array);
+    debug_log("msg: %s\n", data_array);
     uint16_t length = 6;
     ret_code_t err_code;
     err_code = ble_nus_data_send(&m_nus, data_array, &length, m_conn_handle);

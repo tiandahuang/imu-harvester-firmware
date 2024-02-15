@@ -73,7 +73,9 @@ static void idle_state_handle(void) {
 
 APP_TIMER_DEF(m_repeated_timer_id);
 void timer_handler(void *p_context) {
+    debug_log("Timer handler start");
     ble_send();
+    debug_log("Timer handler end");
 }
 
 /**@brief Application main function.
@@ -96,7 +98,7 @@ int main(void) {
                                 timer_handler);
     APP_ERROR_CHECK(err_code);
     err_code = app_timer_start(m_repeated_timer_id,
-                               APP_TIMER_TICKS(200),
+                               APP_TIMER_TICKS(1000),
                                NULL);
     APP_ERROR_CHECK(err_code);
 
