@@ -88,7 +88,7 @@ int main(void) {
     ble_all_services_init();
 
     // Start execution.
-    debug_log("Debug logging for UART over RTT started.");
+    debug_log("Debug logging over RTT started.");
     advertising_start();
 
     ret_code_t err_code;
