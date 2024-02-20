@@ -129,6 +129,7 @@
                 "__ASM=__asm",
                 "__INLINE=inline",
                 "__STATIC_INLINE=static inline",
+                "__WEAK=__attribute__((weak))",
                 "VSCODE_EDITING",
                 "APP_TIMER_V2",
                 "APP_TIMER_V2_RTC1_ENABLE",
@@ -144,7 +145,7 @@
                 "S112",
                 "SOFTDEVICE_PRESENT",
                 "USE_APP_CONFIG"
-            ],
+            ],       
             "cStandard": "gnu99",
             "intelliSenseMode": "${default}"
         }

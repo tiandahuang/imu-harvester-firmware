@@ -44,7 +44,6 @@
 
 #include "app_timer.h"
 #include "app_ble_nus.h"
-#include "app_debug.h"
 
 /**@brief Function for assert macro callback.
  *
@@ -71,11 +70,11 @@ static void idle_state_handle(void) {
     }
 }
 
+bool send_pend = false;
 APP_TIMER_DEF(m_repeated_timer_id);
 void timer_handler(void *p_context) {
-    debug_log("Timer handler start");
-    ble_send();
-    debug_log("Timer handler end");
+    // send_pend = true;
+    ble_send("hello world", sizeof("hello world") - 1);
 }
 
 /**@brief Application main function.

@@ -1,6 +1,7 @@
 
 #include "app_ble_nus.h"
-#include "app_debug.h"
+#include "app_common.h"
+#include "app_callbacks.h"
 
 #include "ble_advdata.h"
 #include "ble_advertising.h"
@@ -21,14 +22,11 @@
 
 #define APP_BLE_CONN_CFG_TAG 1 /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define DEVICE_NAME "test"                               /**< Name of device. Will be included in the advertising data. */
 #define NUS_SERVICE_UUID_TYPE BLE_UUID_TYPE_VENDOR_BEGIN /**< UUID type for the Nordic UART Service (vendor specific). */
 
 #define APP_BLE_OBSERVER_PRIO 3 /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 
-#define APP_ADV_INTERVAL 64 /**< The advertising interval (in units of 0.625 ms. This value corresponds to 40 ms). */
 
-#define APP_ADV_DURATION 18000 /**< The advertising duration (180 seconds) in units of 10 milliseconds. */
 
 #define MIN_CONN_INTERVAL MSEC_TO_UNITS(20, UNIT_1_25_MS)    /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
 #define MAX_CONN_INTERVAL MSEC_TO_UNITS(75, UNIT_1_25_MS)    /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
@@ -38,11 +36,6 @@
 #define NEXT_CONN_PARAMS_UPDATE_DELAY APP_TIMER_TICKS(30000) /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT 3                       /**< Number of attempts before giving up the connection parameter negotiation. */
 
-#define DEAD_BEEF 0xDEADBEEF /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
-
-#define UART_TX_BUF_SIZE 256 /**< UART TX buffer size. */
-#define UART_RX_BUF_SIZE 256 /**< UART RX buffer size. */
-
 BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT); /**< BLE NUS service instance. */
 NRF_BLE_GATT_DEF(m_gatt);                         /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);                           /**< Context for the Queued Write module.*/
@@ -51,8 +44,10 @@ BLE_ADVERTISING_DEF(m_advertising);               /**< Advertising module instan
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;               /**< Handle of the current connection. */
 static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3; /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 static ble_uuid_t m_adv_uuids[] =                                      /**< Universally unique service identifier. */
-    {
-        {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}};
+    {{BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}};
+
+static bool ble_connected = false;
+static bool ble_notifications_en = false;
 
 /**@brief Function for handling Queued Write Module errors.
  *
@@ -93,6 +88,12 @@ static int gap_params_init(void) {
     return (err_code != NRF_SUCCESS) ? 1 : 0;
 }
 
+
+WEAK_CALLBACK_DEF(BLE_NUS_EVT_RX_DATA)
+WEAK_CALLBACK_DEF(BLE_NUS_EVT_TX_RDY)
+WEAK_CALLBACK_DEF(BLE_NUS_EVT_COMM_STARTED)
+WEAK_CALLBACK_DEF(BLE_NUS_EVT_COMM_STOPPED)
+
 /**@brief Function for handling the data from the Nordic UART Service.
  *
  * @details This function will process the data received from the Nordic UART BLE Service and send
@@ -102,14 +103,23 @@ static int gap_params_init(void) {
  */
 /**@snippet [Handling the data received over BLE] */
 static void nus_data_handler(ble_nus_evt_t *p_evt) {
-
-    if (p_evt->type == BLE_NUS_EVT_RX_DATA) {
-        uint32_t err_code;
-
-        debug_log("Received data from BLE NUS:");
-        for (uint32_t i = 0; i < p_evt->params.rx_data.length; i++) {
-            debug_log("%02x ", p_evt->params.rx_data.p_data[i]);
-        }
+    switch (p_evt->type) {
+    case BLE_NUS_EVT_RX_DATA:
+        CALLBACK_FUNC(BLE_NUS_EVT_RX_DATA)();
+        break;
+    case BLE_NUS_EVT_TX_RDY:
+        CALLBACK_FUNC(BLE_NUS_EVT_TX_RDY)();
+        break;
+    case BLE_NUS_EVT_COMM_STARTED:
+        CALLBACK_FUNC(BLE_NUS_EVT_COMM_STARTED)();
+        ble_notifications_en = true;
+        break;
+    case BLE_NUS_EVT_COMM_STOPPED:
+        CALLBACK_FUNC(BLE_NUS_EVT_COMM_STOPPED)();
+        ble_notifications_en = false;
+        break;
+    default: // Should not reach here
+        break;
     }
 }
 
@@ -199,11 +209,20 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
     case BLE_ADV_EVT_FAST:
         break;
     case BLE_ADV_EVT_IDLE:
+        ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
         break;
     default:
         break;
     }
 }
+
+WEAK_CALLBACK_DEF(BLE_GAP_EVT_CONNECTED)
+WEAK_CALLBACK_DEF(BLE_GAP_EVT_DISCONNECTED)
+WEAK_CALLBACK_DEF(BLE_GAP_EVT_PHY_UPDATE_REQUEST)
+WEAK_CALLBACK_DEF(BLE_GAP_EVT_SEC_PARAMS_REQUEST)
+WEAK_CALLBACK_DEF(BLE_GATTS_EVT_SYS_ATTR_MISSING)
+WEAK_CALLBACK_DEF(BLE_GATTC_EVT_TIMEOUT)
+WEAK_CALLBACK_DEF(BLE_GATTS_EVT_TIMEOUT)
 
 /**@brief Function for handling BLE events.
  *
@@ -215,20 +234,21 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context) {
 
     switch (p_ble_evt->header.evt_id) {
     case BLE_GAP_EVT_CONNECTED:
-        debug_log("Connected");
+        CALLBACK_FUNC(BLE_GAP_EVT_CONNECTED)();
+        ble_connected = true;
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
         err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
         APP_ERROR_CHECK(err_code);
         break;
 
     case BLE_GAP_EVT_DISCONNECTED:
-        debug_log("Disconnected");
-        // LED indication will be changed when advertising starts.
+        CALLBACK_FUNC(BLE_GAP_EVT_DISCONNECTED)();
+        ble_connected = false;
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         break;
 
     case BLE_GAP_EVT_PHY_UPDATE_REQUEST: {
-        debug_log("PHY update request.");
+        CALLBACK_FUNC(BLE_GAP_EVT_PHY_UPDATE_REQUEST)();
         ble_gap_phys_t const phys =
             {
                 .rx_phys = BLE_GAP_PHY_AUTO,
@@ -240,18 +260,21 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context) {
 
     case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
         // Pairing not supported
+        CALLBACK_FUNC(BLE_GAP_EVT_SEC_PARAMS_REQUEST)();
         err_code = sd_ble_gap_sec_params_reply(m_conn_handle, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL);
         APP_ERROR_CHECK(err_code);
         break;
 
     case BLE_GATTS_EVT_SYS_ATTR_MISSING:
         // No system attributes have been stored.
+        CALLBACK_FUNC(BLE_GATTS_EVT_SYS_ATTR_MISSING)();
         err_code = sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0, 0);
         APP_ERROR_CHECK(err_code);
         break;
 
     case BLE_GATTC_EVT_TIMEOUT:
         // Disconnect on GATT Client timeout event.
+        CALLBACK_FUNC(BLE_GATTC_EVT_TIMEOUT)();
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
                                          BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
@@ -259,6 +282,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context) {
 
     case BLE_GATTS_EVT_TIMEOUT:
         // Disconnect on GATT Server timeout event.
+        CALLBACK_FUNC(BLE_GATTS_EVT_TIMEOUT)();
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
                                          BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
@@ -295,15 +319,14 @@ static int ble_stack_init(void) {
     return 0;
 }
 
+WEAK_CALLBACK_DEF(NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)
+
 /**@brief Function for handling events from the GATT library. */
 void gatt_evt_handler(nrf_ble_gatt_t *p_gatt, nrf_ble_gatt_evt_t const *p_evt) {
     if ((m_conn_handle == p_evt->conn_handle) && (p_evt->evt_id == NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)) {
+        CALLBACK_FUNC(NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)();
         m_ble_nus_max_data_len = p_evt->params.att_mtu_effective - OPCODE_LENGTH - HANDLE_LENGTH;
-        debug_log("Data len is set to 0x%X(%d)", m_ble_nus_max_data_len, m_ble_nus_max_data_len);
     }
-    debug_log("ATT MTU exchange completed. central 0x%x peripheral 0x%x",
-              p_gatt->att_mtu_desired_central,
-              p_gatt->att_mtu_desired_periph);
 }
 
 /**@brief Function for initializing the GATT library. */
@@ -348,13 +371,9 @@ static int advertising_init(void) {
  * public functions -----------------------------------------------------------
  */
 
-/**@brief Function for starting advertising.
+/**
+ * @brief initialize BLE stack
  */
-void advertising_start(void) {
-    uint32_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
-    APP_ERROR_CHECK(err_code);
-}
-
 void ble_all_services_init(void) {
     if (    ble_stack_init()
          || gap_params_init()
@@ -366,20 +385,23 @@ void ble_all_services_init(void) {
     }
 }
 
-void ble_send(void) {
-    if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
-        return;
+/**
+ * @brief start advertising. ble stack should be initialized first
+ */
+void advertising_start(void) {
+    uint32_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
+    APP_ERROR_CHECK(err_code);
+}
+
+/**
+ * @brief send data over BLE NUS
+ * @return NRF_SUCCESS if successful, otherwise an error code
+ *         NRF_ERROR_INVALID_STATE if not connected or notifications not enabled
+ */
+ret_code_t ble_send(uint8_t *data, uint16_t length) {
+    if (!ble_connected || !ble_notifications_en) {
+        return NRF_ERROR_INVALID_STATE;
     }
 
-    static char hello[] = "hello";
-    static char world[] = "world";
-
-    static int toggle = 0x0;
-    toggle ^= 0x1;
-    char *data_array = toggle ? hello : world;
-    debug_log("msg: %s\n", data_array);
-    uint16_t length = 6;
-    ret_code_t err_code;
-    err_code = ble_nus_data_send(&m_nus, data_array, &length, m_conn_handle);
-    APP_ERROR_CHECK(err_code);
+    return ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
 }

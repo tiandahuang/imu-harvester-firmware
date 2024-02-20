@@ -14,6 +14,8 @@
         "nrf_log.h": "c",
         "nrf_log_ctrl.h": "c",
         "sdk_common.h": "c",
-        "app_util_platform.h": "c"
+        "app_util_platform.h": "c",
+        "app_ble_nus.h": "c",
+        "app_common.h": "c"
     }
 }
