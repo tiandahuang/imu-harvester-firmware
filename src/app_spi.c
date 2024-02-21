@@ -7,7 +7,7 @@
 #include "nrf_gpio.h"
 #include "nrf_pwr_mgmt.h"
 
-#define SPI_INSTANCE 0
+#define SPI_INSTANCE 1
 static const nrfx_spim_t spi = NRFX_SPIM_INSTANCE(SPI_INSTANCE);
 
 static uint8_t m_tx_buf[APP_SPI_MAX_TRANSFER_LEN] = {0};
@@ -37,7 +37,8 @@ void app_spi_init(void) {
     spi_config.mosi_pin         = SPI_MOSI;
     spi_config.sck_pin          = SPI_SCK;
     spi_config.ss_active_high   = false;
-    APP_ERROR_CHECK((&spi, &spi_config, spim_event_handler, NULL));
+    APP_ERROR_CHECK(
+            nrfx_spim_init(&spi, &spi_config, spim_event_handler, NULL));
 }
 
 // perform readwrite on spi. 
@@ -62,7 +63,6 @@ int app_spi_readwrite(uint8_t *tx, uint8_t *rx, uint8_t len, callback_t xfer_don
 
     nrfx_spim_xfer_desc_t xfer_desc = NRFX_SPIM_XFER_TRX(m_tx_buf, len, m_rx_buf, len);
     result = nrfx_spim_xfer(&spi, &xfer_desc, 0);
-    debug_log("1failed: %d", result);
     if (result != NRFX_SUCCESS) return (int)result;
 
     if (xfer_done) return 0;  // callback supplied; return to caller
@@ -98,7 +98,6 @@ int app_spi_readwrite_reg(uint8_t reg, uint8_t *tx, uint8_t *rx, uint8_t len, ca
 
     nrfx_spim_xfer_desc_t xfer_desc = NRFX_SPIM_XFER_TRX(m_tx_buf, len + 1, m_rx_buf, len + 1);
     result = nrfx_spim_xfer(&spi, &xfer_desc, 0);
-    debug_log("2failed: %d", result);
     if (result != NRFX_SUCCESS) return (int)result;
 
     if (xfer_done) return 0;  // callback supplied; return to caller

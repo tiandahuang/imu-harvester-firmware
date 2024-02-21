@@ -86,11 +86,12 @@ int main(void) {
     // Initialize.
     nrf_pwr_mgmt_init();
     debug_init();
-    // app_spi_init();
-    // accelerometer_init();
-    app_timer_init();
-    ble_all_services_init();
+    app_spi_init();
+    while (accelerometer_init());
 
+    ble_all_services_init();
+    app_timer_init();
+    
     // Start execution.
     debug_log("Debug logging over RTT started.");
     advertising_start();

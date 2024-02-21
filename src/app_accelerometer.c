@@ -49,6 +49,7 @@ int accelerometer_init(void) {
     // check for device existence
     if (bma400_init(&bma) != BMA400_OK) {
         debug_log("bma400 not found!");
+        debug_flush();
         return -1;
     }
 
