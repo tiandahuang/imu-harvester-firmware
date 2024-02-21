@@ -26,18 +26,16 @@ void bma400_delay_us(
         void *intf_ptr);
 
 
+#define N_FRAMES    (ACCELEROMETER_N_SAMPLES * 6)
+#define FIFO_SIZE   ((N_FRAMES) + (BMA400_FIFO_BYTES_OVERREAD))
 
-#define N_FRAMES 16
-#define FIFO_SIZE ((N_FRAMES) + (BMA400_FIFO_BYTES_OVERREAD))
-
-struct bma400_sensor_data accel_data[N_FRAMES] = { { 0 } };
+struct bma400_sensor_data accel_data[ACCELEROMETER_N_SAMPLES] = { { 0 } };
 
 struct bma400_int_enable int_en;
 struct bma400_fifo_data fifo_frame;
 struct bma400_device_conf fifo_conf;
 struct bma400_sensor_conf conf;
 
-uint16_t int_status = 0;
 uint8_t fifo_buff[FIFO_SIZE] = { 0 };
 uint16_t accel_frames_req = N_FRAMES;
 
@@ -54,7 +52,6 @@ struct bma400_dev           bma         = {
 WEAK_CALLBACK_DEF(ACCELEROMETER_DATA_READY)
 
 static void int1_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
-    int_status = 1;
     CALLBACK_FUNC(ACCELEROMETER_DATA_READY)();
 }
 
@@ -133,14 +130,18 @@ void accelerometer_sleep(void) {
     bma400_set_power_mode(BMA400_MODE_SLEEP, &bma);
 }
 
-void accelerometer_get_data(uint8_t **data_ptr, uint16_t *data_len) {
+void accelerometer_get_data(uint8_t *data_ptr, uint16_t *data_len) {
 
-    // bma400_get_fifo_data(&fifo_frame, &bma);
-    // accel_frames_req = N_FRAMES;
-    // bma400_extract_accel(&fifo_frame, accel_data, &accel_frames_req, &bma);
-    // *data_len = accel_frames_req;
+    bma400_get_fifo_data(&fifo_frame, &bma);
+    accel_frames_req = N_FRAMES;
+    bma400_extract_accel(&fifo_frame, accel_data, &accel_frames_req, &bma);
+    *data_len = 6 * accel_frames_req;
 
-    bma400_get_regs(BMA400_REG_FIFO_LENGTH, (uint8_t *)data_len, 2, &bma);
+    for (uint8_t i = 0; i < MIN(accel_frames_req, ACCELEROMETER_N_SAMPLES); i++) {
+        memcpy(&data_ptr[6 * i],     &(accel_data[i].x), sizeof(accel_data[i].x));
+        memcpy(&data_ptr[6 * i + 2], &(accel_data[i].y), sizeof(accel_data[i].y));
+        memcpy(&data_ptr[6 * i + 4], &(accel_data[i].z), sizeof(accel_data[i].z));
+    }
 }
 
 

@@ -44,11 +44,14 @@
 #include "nrfx_gpiote.h"
 
 #include "app_timer.h"
+#include "app_scheduler.h"
+
 #include "app_ble_nus.h"
 #include "app_spi.h"
 #include "app_accelerometer.h"
 
-#include "nrf_delay.h"
+#define APP_SCHED_EVENT_SIZE    APP_TIMER_SCHED_EVENT_DATA_SIZE
+#define APP_SCHED_QUEUE_SIZE    10
 
 /**@brief Function for assert macro callback.
  *
@@ -75,18 +78,14 @@ static void idle_state_handle(void) {
     }
 }
 
-bool send_pend = false;
+static void start_sampling_accel(void *p_event_data, uint16_t event_size) {
+    debug_log("accelerometer set to wake");
+    accelerometer_wake();
+}
+
 APP_TIMER_DEF(m_repeated_timer_id);
 void timer_handler(void *p_context) {
-    // send_pend = true;
-    // ble_send("hello world", sizeof("hello world") - 1);
-    debug_log("accelerometer set to wake");
-    // debug_flush();
-    // accelerometer_wake();
-    uint16_t num_data;
-    accelerometer_get_data(NULL, &num_data);
-    debug_log("ACCELEROMETER_DATA_READY: %d", num_data);
-    debug_flush();
+    app_sched_event_put(NULL, 0, start_sampling_accel);
 }
 
 /**@brief Application main function.
@@ -98,9 +97,9 @@ int main(void) {
     debug_init();
     nrfx_gpiote_init();
     app_spi_init();
+    APP_SCHED_INIT(APP_SCHED_EVENT_SIZE, APP_SCHED_QUEUE_SIZE);
 
     accelerometer_init();
-    accelerometer_wake();
 
     ble_all_services_init();
     app_timer_init();
@@ -115,12 +114,13 @@ int main(void) {
                                 timer_handler);
     APP_ERROR_CHECK(err_code);
     err_code = app_timer_start(m_repeated_timer_id,
-                               APP_TIMER_TICKS(1000),
+                               APP_TIMER_TICKS(2000),
                                NULL);
     APP_ERROR_CHECK(err_code);
 
     // Enter main loop.
     for (;;) {
+        app_sched_execute();
         idle_state_handle();
     }
 }

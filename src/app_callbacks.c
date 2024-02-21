@@ -31,12 +31,12 @@ CALLBACK_DEF(BLE_NUS_EVT_COMM_STARTED) {
 #else   // POWER_PROFILING
 
 // NUS connected -- do nothing here
-CALLBACK_DEF(BLE_NUS_EVT_CONNECTED) {
+CALLBACK_DEF_APP_SCHED(BLE_NUS_EVT_CONNECTED) {
     debug_log("NUS connected");
 }
 
 // NUS notifications enabled -- start sending on clock
-CALLBACK_DEF(BLE_NUS_EVT_COMM_STARTED) {
+CALLBACK_DEF_APP_SCHED(BLE_NUS_EVT_COMM_STARTED) {
     debug_log("NUS notifications enabled");
     // ret_code_t err_code;
     // err_code = ble_send("hello world", sizeof("hello world") - 1);
@@ -45,15 +45,14 @@ CALLBACK_DEF(BLE_NUS_EVT_COMM_STARTED) {
     // }
 }
 
-CALLBACK_DEF(ACCELEROMETER_DATA_READY) {
-    // debug_log("ACCELEROMETER_DATA_READY");
-    // debug_flush();
-    return;
+uint8_t accelerometer_data_buf[ACCELEROMETER_N_SAMPLES * 6] = { 0 };
+CALLBACK_DEF_APP_SCHED(ACCELEROMETER_DATA_READY) {
     uint16_t num_data;
-    accelerometer_get_data(NULL, &num_data);
+    accelerometer_get_data(accelerometer_data_buf, &num_data);
     debug_log("ACCELEROMETER_DATA_READY: %d", num_data);
-    debug_flush();
-    // accelerometer_sleep();
+    accelerometer_sleep();
+
+    ble_send(accelerometer_data_buf, num_data);
 }
 
 #endif

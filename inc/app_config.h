@@ -5,7 +5,7 @@
 #pragma message "Linked App Config"
 
 #ifndef VSCODE_EDITING
-#define NRF_LOG_ENABLED 1
+#define NRF_LOG_ENABLED 0
 #else   // in vscode
 #define NRF_LOG_ENABLED 0
 #endif

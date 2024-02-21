@@ -27,6 +27,7 @@
         "nrf_pwr_mgmt.h": "c",
         "common.h": "c",
         "nrfx_gpiote.h": "c",
-        "app_accelerometer.h": "c"
+        "app_accelerometer.h": "c",
+        "app_scheduler.h": "c"
     }
 }
