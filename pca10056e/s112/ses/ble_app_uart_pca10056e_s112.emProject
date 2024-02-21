@@ -80,13 +80,12 @@
     </folder>
     <folder Name="nRF_Drivers">
       <file file_name="../../../../../../integration/nrfx/legacy/nrf_drv_clock.c" />
-      <file file_name="../../../../../../integration/nrfx/legacy/nrf_drv_uart.c" />
       <file file_name="../../../../../../modules/nrfx/soc/nrfx_atomic.c" />
       <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_clock.c" />
       <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_gpiote.c" />
       <file file_name="../../../../../../modules/nrfx/drivers/src/prs/nrfx_prs.c" />
-      <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_uart.c" />
-      <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_uarte.c" />
+      <file file_name="../../../../../../modules/nrfx/drivers/include/nrfx_spim.h" />
+      <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_spim.c" />
     </folder>
     <folder Name="Board Support">
       <file file_name="../../../../../../components/libraries/bsp/bsp.c" />
@@ -100,6 +99,9 @@
       <file file_name="../../../inc/app_config.h" />
       <file file_name="../../../src/app_callbacks.c" />
       <file file_name="../../../inc/app_callbacks.h" />
+      <file file_name="../../../src/app_accelerometer.c" />
+      <file file_name="../../../src/app_spi.c" />
+      <file file_name="../../../src/bma400.c" />
     </folder>
     <folder Name="nRF_Segger_RTT">
       <file file_name="../../../../../../external/segger_rtt/SEGGER_RTT.c" />
@@ -129,7 +131,7 @@
     </folder>
     <configuration
       Name="Release"
-      c_preprocessor_definitions="USE_APP_CONFIG" />
+      c_preprocessor_definitions="USE_APP_CONFIG;CONFIG_NFCT_PINS_AS_GPIOS" />
   </project>
   <configuration
     Name="Release"

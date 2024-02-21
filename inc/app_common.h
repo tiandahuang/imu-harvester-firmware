@@ -15,6 +15,18 @@
 
 // config
 
+// GPIO config
+#define GPIO_V_STORE_DIV_IN     4           // capacitor voltage
+#define GPIO_DIV_EN             5           // enable capacitor voltage divider
+
+#define SPI_SCK                 9
+#define SPI_MISO                10
+#define SPI_MOSI                12
+
+#define IMU_CS                  6
+#define IMU_INT1                14
+#define IMU_INT2                15
+
 // test config
 #define POWER_PROFILING                     // enable power profiling -- runs IMU sample and BLE send on loop
 

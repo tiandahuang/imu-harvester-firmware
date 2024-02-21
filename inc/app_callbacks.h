@@ -15,3 +15,5 @@
 #define CALLBACK_FUNC(name) \
         handler_##name
 
+typedef void (* callback_t)(void);
+

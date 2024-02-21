@@ -37,11 +37,11 @@ CALLBACK_DEF(BLE_NUS_EVT_CONNECTED) {
 // NUS notifications enabled -- start sending on clock
 CALLBACK_DEF(BLE_NUS_EVT_COMM_STARTED) {
     debug_log("NUS notifications enabled");
-    ret_code_t err_code;
-    err_code = ble_send("hello world", sizeof("hello world") - 1);
-    if (err_code != NRF_ERROR_INVALID_STATE) {
-        APP_ERROR_CHECK(err_code);
-    }
+    // ret_code_t err_code;
+    // err_code = ble_send("hello world", sizeof("hello world") - 1);
+    // if (err_code != NRF_ERROR_INVALID_STATE) {
+    //     APP_ERROR_CHECK(err_code);
+    // }
 }
 
 #endif

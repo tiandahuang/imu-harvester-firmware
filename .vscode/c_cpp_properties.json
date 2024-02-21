@@ -118,8 +118,8 @@
                 "${workspaceFolder}/../../../modules/nrfx/drivers/include",
                 "${workspaceFolder}/../../../modules/nrfx/hal",
                 "${workspaceFolder}/../../../modules/nrfx/mdk",
-                "${workspaceFolder}/inc",
-                "${workspaceFolder}/src",
+                "${workspaceFolder}/inc/*",
+                "${workspaceFolder}/src/*",
                 "${workspaceFolder}/pca10056e/s112/config"
             ],
             "defines": [

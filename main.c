@@ -44,6 +44,8 @@
 
 #include "app_timer.h"
 #include "app_ble_nus.h"
+#include "app_spi.h"
+#include "app_accelerometer.h"
 
 /**@brief Function for assert macro callback.
  *
@@ -82,9 +84,11 @@ void timer_handler(void *p_context) {
 int main(void) {
 
     // Initialize.
-    debug_init();
-    app_timer_init();
     nrf_pwr_mgmt_init();
+    debug_init();
+    // app_spi_init();
+    // accelerometer_init();
+    app_timer_init();
     ble_all_services_init();
 
     // Start execution.

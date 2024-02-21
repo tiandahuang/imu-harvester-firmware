@@ -16,6 +16,14 @@
         "sdk_common.h": "c",
         "app_util_platform.h": "c",
         "app_ble_nus.h": "c",
-        "app_common.h": "c"
+        "app_common.h": "c",
+        "bma400.h": "c",
+        "bma400_defs.h": "c",
+        "nrfx_spim.h": "c",
+        "nrf_drv_spi.h": "c",
+        "app_spi.h": "c",
+        "stdlib.h": "c",
+        "app_callbacks.h": "c",
+        "nrf_pwr_mgmt.h": "c"
     }
 }
