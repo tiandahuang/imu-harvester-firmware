@@ -724,7 +724,6 @@ int8_t bma400_set_regs(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, 
     return rslt;
 }
 
-// Changed: register read accounts for dummy byte
 int8_t bma400_get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct bma400_dev *dev)
 {
     int8_t rslt;
@@ -736,8 +735,8 @@ int8_t bma400_get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct
     /* Proceed if null check is fine */
     if ((rslt == BMA400_OK) && (reg_data != NULL))
     {
-        // uint32_t temp_len = len + dev->dummy_byte;
-        // uint8_t temp_buff[temp_len];
+        uint32_t temp_len = len + dev->dummy_byte;
+        uint8_t temp_buff[temp_len];
 
         if (dev->intf != BMA400_I2C_INTF)
         {
@@ -746,18 +745,17 @@ int8_t bma400_get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct
         }
 
         /* Read the data from the reg_addr */
-        // dev->intf_rslt = dev->read(reg_addr, temp_buff, temp_len, dev->intf_ptr);
-        dev->intf_rslt = dev->read(reg_addr, reg_data, len, dev->intf_ptr);
+        dev->intf_rslt = dev->read(reg_addr, temp_buff, temp_len, dev->intf_ptr);
         if (dev->intf_rslt == BMA400_INTF_RET_SUCCESS)
         {
-            // for (index = 0; index < len; index++)
-            // {
-            //     /* Parse the data read and store in "reg_data"
-            //      * buffer so that the dummy byte is removed
-            //      * and user will get only valid data
-            //      */
-            //     reg_data[index] = temp_buff[index + dev->dummy_byte];
-            // }
+            for (index = 0; index < len; index++)
+            {
+                /* Parse the data read and store in "reg_data"
+                 * buffer so that the dummy byte is removed
+                 * and user will get only valid data
+                 */
+                reg_data[index] = temp_buff[index + dev->dummy_byte];
+            }
         }
         else
         {
