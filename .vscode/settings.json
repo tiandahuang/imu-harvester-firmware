@@ -24,6 +24,9 @@
         "app_spi.h": "c",
         "stdlib.h": "c",
         "app_callbacks.h": "c",
-        "nrf_pwr_mgmt.h": "c"
+        "nrf_pwr_mgmt.h": "c",
+        "common.h": "c",
+        "nrfx_gpiote.h": "c",
+        "app_accelerometer.h": "c"
     }
 }

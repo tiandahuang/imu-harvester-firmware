@@ -5,6 +5,7 @@
 #include "app_callbacks.h"
 #include "app_debug.h"
 #include "app_ble_nus.h"
+#include "app_accelerometer.h"
 
 // BLE events
 
@@ -42,6 +43,17 @@ CALLBACK_DEF(BLE_NUS_EVT_COMM_STARTED) {
     // if (err_code != NRF_ERROR_INVALID_STATE) {
     //     APP_ERROR_CHECK(err_code);
     // }
+}
+
+CALLBACK_DEF(ACCELEROMETER_DATA_READY) {
+    // debug_log("ACCELEROMETER_DATA_READY");
+    // debug_flush();
+    return;
+    uint16_t num_data;
+    accelerometer_get_data(NULL, &num_data);
+    debug_log("ACCELEROMETER_DATA_READY: %d", num_data);
+    debug_flush();
+    // accelerometer_sleep();
 }
 
 #endif

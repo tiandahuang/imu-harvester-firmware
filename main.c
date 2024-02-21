@@ -41,6 +41,7 @@
 #include "app_common.h"
 #include "nrf.h"
 #include "nrf_pwr_mgmt.h"
+#include "nrfx_gpiote.h"
 
 #include "app_timer.h"
 #include "app_ble_nus.h"
@@ -78,7 +79,14 @@ bool send_pend = false;
 APP_TIMER_DEF(m_repeated_timer_id);
 void timer_handler(void *p_context) {
     // send_pend = true;
-    ble_send("hello world", sizeof("hello world") - 1);
+    // ble_send("hello world", sizeof("hello world") - 1);
+    debug_log("accelerometer set to wake");
+    // debug_flush();
+    // accelerometer_wake();
+    uint16_t num_data;
+    accelerometer_get_data(NULL, &num_data);
+    debug_log("ACCELEROMETER_DATA_READY: %d", num_data);
+    debug_flush();
 }
 
 /**@brief Application main function.
@@ -88,8 +96,11 @@ int main(void) {
     // Initialize.
     nrf_pwr_mgmt_init();
     debug_init();
+    nrfx_gpiote_init();
     app_spi_init();
+
     accelerometer_init();
+    accelerometer_wake();
 
     ble_all_services_init();
     app_timer_init();

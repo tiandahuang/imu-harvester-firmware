@@ -9,11 +9,11 @@
 
 // callback function declaration macro
 #define WEAK_CALLBACK_DEF(name) \
-        __WEAK void handler_##name(void) { debug_log("event: " #name); }
+        __WEAK void callback_##name(void) { debug_log("event: " #name); }
 #define CALLBACK_DEF(name) \
-        void handler_##name(void)
+        void callback_##name(void)
 #define CALLBACK_FUNC(name) \
-        handler_##name
+        callback_##name
 
 typedef void (* callback_t)(void);
 
