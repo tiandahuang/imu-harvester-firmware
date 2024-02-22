@@ -11,4 +11,5 @@
 int accelerometer_init(void);
 void accelerometer_wake(void);
 void accelerometer_sleep(void);
-void accelerometer_get_data(uint8_t *data_ptr, uint16_t *data_len);
+uint16_t accelerometer_fetch_data(void);
+void accelerometer_copy_data(uint8_t *data_ptr, uint16_t data_len);

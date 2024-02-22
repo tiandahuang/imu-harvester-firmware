@@ -7,25 +7,57 @@
 #include "app_ble_nus.h"
 #include "app_accelerometer.h"
 
+// global buffers for sharing data
+
+uint8_t accelerometer_data_buf[ACCELEROMETER_N_SAMPLES * 6] = { 0 };
+uint16_t accelerometer_num_data = 0;
+
 // BLE events
+
+static bool send_pend = false;
+static bool send_ready = false;
 
 #ifndef POWER_PROFILING
 
 // NUS connected -- start sampling IMU
-CALLBACK_DEF(BLE_NUS_EVT_CONNECTED) {
-    debug_log("NUS connected");
-    ret_code_t err_code = 0;
-    APP_ERROR_CHECK(err_code);
+CALLBACK_DEF_APP_SCHED(BLE_GAP_EVT_CONNECTED) {
+    debug_log("NUS connected. Waking accelerometer.");
+    accelerometer_wake();
 }
 
 // NUS notifications enabled -- send data
-CALLBACK_DEF(BLE_NUS_EVT_COMM_STARTED) {
+CALLBACK_DEF_APP_SCHED(BLE_NUS_EVT_COMM_STARTED) {
     debug_log("NUS notifications enabled");
-    ret_code_t err_code;
-    err_code = ble_send("hello world", sizeof("hello world") - 1);
-    if (err_code != NRF_ERROR_INVALID_STATE) {
-        APP_ERROR_CHECK(err_code);
+    send_ready = true;
+    if (send_pend) {    // notifications enabled after watermark interrupt
+        debug_log("notifications enabled, sending pending data");
+        send_pend = false;
+        ble_send(accelerometer_data_buf, accelerometer_num_data);
     }
+}
+
+// Accelerometer watermark interrupt raised
+CALLBACK_DEF_APP_SCHED(ACCELEROMETER_DATA_READY) {
+    accelerometer_num_data = accelerometer_fetch_data();
+    accelerometer_copy_data(accelerometer_data_buf, accelerometer_num_data);
+    debug_log("ACCELEROMETER_DATA_READY: %d", accelerometer_num_data);
+    accelerometer_sleep();
+
+    if (send_ready) {   // notifications enabled before watermark interrupt
+        ble_send(accelerometer_data_buf, accelerometer_num_data);
+    }
+    else {              // notifications not yet enabled -- pend a send
+        debug_log("notifications not yet enabled, pending send");
+        send_pend = true;
+    }
+}
+
+// NUS disconnected -- reset
+CALLBACK_DEF_APP_SCHED(BLE_GAP_EVT_DISCONNECTED) {
+    debug_log("NUS disconnected. Resetting.");
+    send_pend = false;
+    send_ready = false;
+    accelerometer_sleep();
 }
 
 #else   // POWER_PROFILING
@@ -35,24 +67,28 @@ CALLBACK_DEF_APP_SCHED(BLE_NUS_EVT_CONNECTED) {
     debug_log("NUS connected");
 }
 
-// NUS notifications enabled -- start sending on clock
+// NUS notifications enabled
 CALLBACK_DEF_APP_SCHED(BLE_NUS_EVT_COMM_STARTED) {
     debug_log("NUS notifications enabled");
-    // ret_code_t err_code;
-    // err_code = ble_send("hello world", sizeof("hello world") - 1);
-    // if (err_code != NRF_ERROR_INVALID_STATE) {
-    //     APP_ERROR_CHECK(err_code);
-    // }
+    send_ready = true;
 }
 
-uint8_t accelerometer_data_buf[ACCELEROMETER_N_SAMPLES * 6] = { 0 };
+// NUS disconnected -- reset
+CALLBACK_DEF_APP_SCHED(BLE_GAP_EVT_DISCONNECTED) {
+    debug_log("NUS disconnected. Resetting.");
+    send_ready = false;
+}
+
+// Accelerometer watermark interrupt raised
 CALLBACK_DEF_APP_SCHED(ACCELEROMETER_DATA_READY) {
-    uint16_t num_data;
-    accelerometer_get_data(accelerometer_data_buf, &num_data);
-    debug_log("ACCELEROMETER_DATA_READY: %d", num_data);
+    accelerometer_num_data = accelerometer_fetch_data();
+    accelerometer_copy_data(accelerometer_data_buf, accelerometer_num_data);
+    debug_log("ACCELEROMETER_DATA_READY: %d", accelerometer_num_data);
     accelerometer_sleep();
 
-    ble_send(accelerometer_data_buf, num_data);
+    if (send_ready) {
+        ble_send(accelerometer_data_buf, accelerometer_num_data);
+    }
 }
 
 #endif

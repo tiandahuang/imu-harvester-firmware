@@ -78,6 +78,7 @@ static void idle_state_handle(void) {
     }
 }
 
+#ifdef POWER_PROFILING
 static void start_sampling_accel(void *p_event_data, uint16_t event_size) {
     debug_log("accelerometer set to wake");
     accelerometer_wake();
@@ -87,6 +88,7 @@ APP_TIMER_DEF(m_repeated_timer_id);
 void timer_handler(void *p_context) {
     app_sched_event_put(NULL, 0, start_sampling_accel);
 }
+#endif
 
 /**@brief Application main function.
  */
@@ -103,20 +105,20 @@ int main(void) {
 
     ble_all_services_init();
     app_timer_init();
-    
-    // Start execution.
-    debug_log("Debug logging over RTT started.");
-    advertising_start();
 
+    #ifdef POWER_PROFILING
     ret_code_t err_code;
     err_code = app_timer_create(&m_repeated_timer_id,
                                 APP_TIMER_MODE_REPEATED,
                                 timer_handler);
-    APP_ERROR_CHECK(err_code);
     err_code = app_timer_start(m_repeated_timer_id,
-                               APP_TIMER_TICKS(2000),
+                               APP_TIMER_TICKS(1000),
                                NULL);
-    APP_ERROR_CHECK(err_code);
+    #endif
+    
+    // Start execution.
+    debug_log("Debug logging over RTT started.");
+    advertising_start();
 
     // Enter main loop.
     for (;;) {

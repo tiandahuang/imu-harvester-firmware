@@ -28,6 +28,10 @@
         "common.h": "c",
         "nrfx_gpiote.h": "c",
         "app_accelerometer.h": "c",
-        "app_scheduler.h": "c"
+        "app_scheduler.h": "c",
+        "inttypes.h": "c",
+        "nrf_sdh.h": "c",
+        "ble_hci.h": "c",
+        "nrf_sdh_soc.h": "c"
     }
 }

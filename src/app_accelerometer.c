@@ -130,19 +130,22 @@ void accelerometer_sleep(void) {
     bma400_set_power_mode(BMA400_MODE_SLEEP, &bma);
 }
 
-void accelerometer_get_data(uint8_t *data_ptr, uint16_t *data_len) {
-
+uint16_t accelerometer_fetch_data(void) {
     bma400_get_fifo_data(&fifo_frame, &bma);
     accel_frames_req = N_FRAMES;
     bma400_extract_accel(&fifo_frame, accel_data, &accel_frames_req, &bma);
-    *data_len = 6 * accel_frames_req;
+    return 6 * accel_frames_req;
+}
 
-    for (uint8_t i = 0; i < MIN(accel_frames_req, ACCELEROMETER_N_SAMPLES); i++) {
+void accelerometer_copy_data(uint8_t *data_ptr, uint16_t data_len) {
+    for (uint16_t i = 0; i < MIN(data_len / 6, ACCELEROMETER_N_SAMPLES); i++) {
         memcpy(&data_ptr[6 * i],     &(accel_data[i].x), sizeof(accel_data[i].x));
         memcpy(&data_ptr[6 * i + 2], &(accel_data[i].y), sizeof(accel_data[i].y));
         memcpy(&data_ptr[6 * i + 4], &(accel_data[i].z), sizeof(accel_data[i].z));
     }
 }
+
+
 
 
 // interface function implmementations
