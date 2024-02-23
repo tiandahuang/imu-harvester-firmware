@@ -36,8 +36,9 @@ static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3; /**< Maxi
 static ble_uuid_t m_adv_uuids[] =                                      /**< Universally unique service identifier. */
     {{BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}};
 
-static bool ble_connected = false;
-static bool ble_notifications_en = false;
+static volatile bool ble_connected = false;
+static volatile bool ble_notifications_en = false;
+static volatile bool ble_advertising = false;
 
 /**@brief Function for handling Queued Write Module errors.
  *
@@ -101,12 +102,12 @@ static void nus_data_handler(ble_nus_evt_t *p_evt) {
         CALLBACK_FUNC(BLE_NUS_EVT_TX_RDY)();
         break;
     case BLE_NUS_EVT_COMM_STARTED:
-        CALLBACK_FUNC(BLE_NUS_EVT_COMM_STARTED)();
         ble_notifications_en = true;
+        CALLBACK_FUNC(BLE_NUS_EVT_COMM_STARTED)();
         break;
     case BLE_NUS_EVT_COMM_STOPPED:
-        CALLBACK_FUNC(BLE_NUS_EVT_COMM_STOPPED)();
         ble_notifications_en = false;
+        CALLBACK_FUNC(BLE_NUS_EVT_COMM_STOPPED)();
         break;
     default: // Should not reach here
         break;
@@ -137,6 +138,9 @@ static int services_init(void) {
     return (err_code != NRF_SUCCESS) ? 1 : 0;
 }
 
+WEAK_CALLBACK_DEF(BLE_CONN_PARAMS_EVT_SUCCEEDED);
+WEAK_CALLBACK_DEF(BLE_CONN_PARAMS_EVT_FAILED);
+
 /**@brief Function for handling an event from the Connection Parameters Module.
  *
  * @details This function will be called for all events in the Connection Parameters Module
@@ -151,9 +155,13 @@ static int services_init(void) {
 static void on_conn_params_evt(ble_conn_params_evt_t *p_evt) {
     uint32_t err_code;
 
-    if (p_evt->evt_type == BLE_CONN_PARAMS_EVT_FAILED) {
+    if (p_evt->evt_type == BLE_CONN_PARAMS_EVT_SUCCEEDED) {
+        CALLBACK_FUNC(BLE_CONN_PARAMS_EVT_SUCCEEDED)();
+    }
+    else if (p_evt->evt_type == BLE_CONN_PARAMS_EVT_FAILED) {
         err_code = sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_CONN_INTERVAL_UNACCEPTABLE);
         APP_ERROR_CHECK(err_code);
+        CALLBACK_FUNC(BLE_CONN_PARAMS_EVT_FAILED)();
     }
 }
 
@@ -197,9 +205,10 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
 
     switch (ble_adv_evt) {
     case BLE_ADV_EVT_FAST:
+        ble_advertising = true;
         break;
     case BLE_ADV_EVT_IDLE:
-        ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
+        ble_advertising = false;
         break;
     default:
         break;
@@ -224,21 +233,20 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context) {
 
     switch (p_ble_evt->header.evt_id) {
     case BLE_GAP_EVT_CONNECTED:
-        CALLBACK_FUNC(BLE_GAP_EVT_CONNECTED)();
         ble_connected = true;
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
         err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
         APP_ERROR_CHECK(err_code);
+        CALLBACK_FUNC(BLE_GAP_EVT_CONNECTED)();
         break;
 
     case BLE_GAP_EVT_DISCONNECTED:
-        CALLBACK_FUNC(BLE_GAP_EVT_DISCONNECTED)();
         ble_connected = false;
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
+        CALLBACK_FUNC(BLE_GAP_EVT_DISCONNECTED)();
         break;
 
     case BLE_GAP_EVT_PHY_UPDATE_REQUEST: {
-        CALLBACK_FUNC(BLE_GAP_EVT_PHY_UPDATE_REQUEST)();
         ble_gap_phys_t const phys =
             {
                 .rx_phys = BLE_GAP_PHY_AUTO,
@@ -246,36 +254,37 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context) {
             };
         err_code = sd_ble_gap_phy_update(p_ble_evt->evt.gap_evt.conn_handle, &phys);
         APP_ERROR_CHECK(err_code);
+        CALLBACK_FUNC(BLE_GAP_EVT_PHY_UPDATE_REQUEST)();
     } break;
 
     case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
         // Pairing not supported
-        CALLBACK_FUNC(BLE_GAP_EVT_SEC_PARAMS_REQUEST)();
         err_code = sd_ble_gap_sec_params_reply(m_conn_handle, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL);
         APP_ERROR_CHECK(err_code);
+        CALLBACK_FUNC(BLE_GAP_EVT_SEC_PARAMS_REQUEST)();
         break;
 
     case BLE_GATTS_EVT_SYS_ATTR_MISSING:
         // No system attributes have been stored.
-        CALLBACK_FUNC(BLE_GATTS_EVT_SYS_ATTR_MISSING)();
         err_code = sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0, 0);
         APP_ERROR_CHECK(err_code);
+        CALLBACK_FUNC(BLE_GATTS_EVT_SYS_ATTR_MISSING)();
         break;
 
     case BLE_GATTC_EVT_TIMEOUT:
         // Disconnect on GATT Client timeout event.
-        CALLBACK_FUNC(BLE_GATTC_EVT_TIMEOUT)();
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
                                          BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
+        CALLBACK_FUNC(BLE_GATTC_EVT_TIMEOUT)();
         break;
 
     case BLE_GATTS_EVT_TIMEOUT:
         // Disconnect on GATT Server timeout event.
-        CALLBACK_FUNC(BLE_GATTS_EVT_TIMEOUT)();
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
                                          BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
+        CALLBACK_FUNC(BLE_GATTS_EVT_TIMEOUT)();
         break;
 
     default:
@@ -314,8 +323,8 @@ WEAK_CALLBACK_DEF(NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)
 /**@brief Function for handling events from the GATT library. */
 void gatt_evt_handler(nrf_ble_gatt_t *p_gatt, nrf_ble_gatt_evt_t const *p_evt) {
     if ((m_conn_handle == p_evt->conn_handle) && (p_evt->evt_id == NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)) {
-        CALLBACK_FUNC(NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)();
         m_ble_nus_max_data_len = p_evt->params.att_mtu_effective - OPCODE_LENGTH - HANDLE_LENGTH;
+        CALLBACK_FUNC(NRF_BLE_GATT_EVT_ATT_MTU_UPDATED)();
     }
 }
 
@@ -371,7 +380,8 @@ void ble_all_services_init(void) {
          || gatt_init() 
          || services_init() 
          || advertising_init() 
-         || conn_params_init()) {
+         || conn_params_init()  // optional -- this could be disabled if not needed
+         ) {
         APP_ERROR_CHECK(NRF_ERROR_INTERNAL);
     }
 }
@@ -380,7 +390,21 @@ void ble_all_services_init(void) {
  * @brief start advertising. ble stack should be initialized first
  */
 void advertising_start(void) {
+    if (ble_advertising) return; // already advertising
+    debug_log("advertising start");
     uint32_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
+    APP_ERROR_CHECK(err_code);
+}
+
+/**
+ * @brief stop advertising.
+ */
+void advertising_stop(void) {
+    if (!ble_advertising) return; // not advertising
+    debug_log("advertising stop");
+    uint32_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_IDLE);
+    APP_ERROR_CHECK(err_code);
+    sd_ble_gap_adv_stop(m_advertising.adv_handle);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -394,5 +418,9 @@ ret_code_t ble_send(uint8_t *data, uint16_t length) {
         return NRF_ERROR_INVALID_STATE;
     }
 
-    return ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
+    // return ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
+    ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
+    sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+    advertising_stop();
+    return NRF_SUCCESS;
 }

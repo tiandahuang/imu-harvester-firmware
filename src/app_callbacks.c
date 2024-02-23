@@ -14,10 +14,11 @@ uint16_t accelerometer_num_data = 0;
 
 // BLE events
 
-static bool send_pend = false;
-static bool send_ready = false;
+static volatile bool send_pend = false;
+static volatile bool send_ready = false;
 
-#ifndef POWER_PROFILING
+#if POWER_PROFILING_ENABLED == 0
+#pragma message "power profiling disabled -- running in one shot sampling mode"
 
 // NUS connected -- start sampling IMU
 CALLBACK_DEF_APP_SCHED(BLE_GAP_EVT_CONNECTED) {
@@ -60,7 +61,8 @@ CALLBACK_DEF_APP_SCHED(BLE_GAP_EVT_DISCONNECTED) {
     accelerometer_sleep();
 }
 
-#else   // POWER_PROFILING
+#else   // POWER_PROFILING_ENABLED == 1
+#pragma message "power profiling enabled -- running in looped sampling mode"
 
 // NUS connected -- do nothing here
 CALLBACK_DEF_APP_SCHED(BLE_NUS_EVT_CONNECTED) {

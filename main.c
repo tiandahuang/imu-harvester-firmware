@@ -78,10 +78,12 @@ static void idle_state_handle(void) {
     }
 }
 
-#ifdef POWER_PROFILING
+#if POWER_PROFILING_ENABLED
 static void start_sampling_accel(void *p_event_data, uint16_t event_size) {
     debug_log("accelerometer set to wake");
     accelerometer_wake();
+    debug_log("started advertising");
+    advertising_start();
 }
 
 APP_TIMER_DEF(m_repeated_timer_id);
@@ -105,14 +107,16 @@ int main(void) {
 
     ble_all_services_init();
     app_timer_init();
+    
 
-    #ifdef POWER_PROFILING
+    #if POWER_PROFILING_ENABLED
+    
     ret_code_t err_code;
     err_code = app_timer_create(&m_repeated_timer_id,
                                 APP_TIMER_MODE_REPEATED,
                                 timer_handler);
     err_code = app_timer_start(m_repeated_timer_id,
-                               APP_TIMER_TICKS(1000),
+                               APP_TIMER_TICKS(2000),
                                NULL);
     #endif
     
