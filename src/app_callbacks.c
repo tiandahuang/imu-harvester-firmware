@@ -6,6 +6,7 @@
 #include "app_debug.h"
 #include "app_ble_nus.h"
 #include "app_accelerometer.h"
+#include "nrf_pwr_mgmt.h"
 
 // global buffers for sharing data
 
@@ -29,12 +30,12 @@ CALLBACK_DEF_APP_SCHED(BLE_GAP_EVT_CONNECTED) {
 // NUS notifications enabled -- send data
 CALLBACK_DEF_APP_SCHED(BLE_NUS_EVT_COMM_STARTED) {
     debug_log("NUS notifications enabled");
-    send_ready = true;
     if (send_pend) {    // notifications enabled after watermark interrupt
         debug_log("notifications enabled, sending pending data");
         send_pend = false;
         ble_send(accelerometer_data_buf, accelerometer_num_data);
     }
+    send_ready = true;
 }
 
 // Accelerometer watermark interrupt raised
@@ -56,9 +57,10 @@ CALLBACK_DEF_APP_SCHED(ACCELEROMETER_DATA_READY) {
 // NUS disconnected -- reset
 CALLBACK_DEF_APP_SCHED(BLE_GAP_EVT_DISCONNECTED) {
     debug_log("NUS disconnected. Resetting.");
-    send_pend = false;
-    send_ready = false;
+    // send_pend = false;
+    // send_ready = false;
     accelerometer_sleep();
+    // nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
 }
 
 #else   // POWER_PROFILING_ENABLED == 1

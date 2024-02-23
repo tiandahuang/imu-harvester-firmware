@@ -82,8 +82,8 @@ static void idle_state_handle(void) {
 static void start_sampling_accel(void *p_event_data, uint16_t event_size) {
     debug_log("accelerometer set to wake");
     accelerometer_wake();
-    debug_log("started advertising");
-    advertising_start();
+    // debug_log("started advertising");
+    // advertising_start();
 }
 
 APP_TIMER_DEF(m_repeated_timer_id);

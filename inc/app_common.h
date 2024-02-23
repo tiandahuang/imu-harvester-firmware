@@ -29,7 +29,7 @@
 #define IMU_INT2                15
 
 // test config
-#define POWER_PROFILING_ENABLED 0           // enable power profiling -- runs IMU sample and BLE send on loop
+#define POWER_PROFILING_ENABLED 1           // enable power profiling -- runs IMU sample and BLE send on loop
 
 // BLE config
 #define DEVICE_NAME             "test"      // device name in BLE advertising

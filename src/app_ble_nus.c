@@ -418,9 +418,9 @@ ret_code_t ble_send(uint8_t *data, uint16_t length) {
         return NRF_ERROR_INVALID_STATE;
     }
 
-    // return ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
-    ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
-    sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-    advertising_stop();
-    return NRF_SUCCESS;
+    return ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
+    // ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
+    // sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+    // advertising_stop();
+    // return NRF_SUCCESS;
 }
