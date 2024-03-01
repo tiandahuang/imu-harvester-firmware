@@ -122,7 +122,7 @@ int main(void) {
     
     // Start execution.
     debug_log("Debug logging over RTT started.");
-    advertising_start();
+    advertising_start(false);
 
     // Enter main loop.
     for (;;) {

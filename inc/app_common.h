@@ -34,8 +34,9 @@
 // BLE config
 #define DEVICE_NAME             "test"      // device name in BLE advertising
 #define ENABLE_DEVICE_NAME      1           // enable device name in advertising
+
 #define APP_ADV_INTERVAL        MSEC_TO_UNITS(20, UNIT_0_625_MS)    // advertising interval (in units of 0.625 ms)
-#define APP_ADV_DURATION        MSEC_TO_UNITS(80, UNIT_10_MS)       // advertising duration (in units of 10 milliseconds)
+#define APP_ADV_DURATION        MSEC_TO_UNITS(200, UNIT_10_MS)      // advertising duration (in units of 10 milliseconds)
 #define MIN_CONN_INTERVAL       MSEC_TO_UNITS(8,  UNIT_1_25_MS)     /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
 #define MAX_CONN_INTERVAL       MSEC_TO_UNITS(10, UNIT_1_25_MS)     /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
 #define SLAVE_LATENCY           150                                 /**< Slave latency. */
@@ -44,3 +45,11 @@
 #define NEXT_CONN_PARAMS_UPDATE_DELAY APP_TIMER_TICKS(30000) /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT 1                       /**< Number of attempts before giving up the connection parameter negotiation. */
 
+#define SEC_PARAM_BOND                  1                                       //!< Perform bonding.
+#define SEC_PARAM_MITM                  0                                       //!< Man In The Middle protection not required.
+#define SEC_PARAM_LESC                  0                                       //!< LE Secure Connections not enabled.
+#define SEC_PARAM_KEYPRESS              0                                       //!< Keypress notifications not enabled.
+#define SEC_PARAM_IO_CAPABILITIES       BLE_GAP_IO_CAPS_NONE                    //!< No I/O capabilities.
+#define SEC_PARAM_OOB                   0                                       //!< Out Of Band data not available.
+#define SEC_PARAM_MIN_KEY_SIZE          7                                       //!< Minimum encryption key size.
+#define SEC_PARAM_MAX_KEY_SIZE          16                                      //!< Maximum encryption key size.

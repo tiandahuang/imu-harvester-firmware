@@ -1,6 +1,5 @@
 
 #include "app_ble_nus.h"
-#include "app_common.h"
 #include "app_callbacks.h"
 
 #include "ble_advdata.h"
@@ -8,9 +7,16 @@
 #include "ble_conn_params.h"
 #include "ble_hci.h"
 #include "ble_nus.h"
+#include "ble_conn_state.h"
+#include "ble_dis.h"
+
+#include "peer_manager.h"
+#include "peer_manager_handler.h"
+#include "fds.h"
 
 #include "nrf_ble_gatt.h"
 #include "nrf_ble_qwr.h"
+#include "nrf_ble_bms.h"
 
 #include "nrf.h"
 #include "nrf_sdh.h"
@@ -27,18 +33,131 @@
 #define APP_BLE_OBSERVER_PRIO 3 /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 
 BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT); /**< BLE NUS service instance. */
+NRF_BLE_BMS_DEF(m_bms);                           //!< Structure used to identify the Bond Management service.
 NRF_BLE_GATT_DEF(m_gatt);                         /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);                           /**< Context for the Queued Write module.*/
 BLE_ADVERTISING_DEF(m_advertising);               /**< Advertising module instance. */
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;               /**< Handle of the current connection. */
 static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3; /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
+static ble_conn_state_user_flag_id_t m_bms_bonds_to_delete;            //!< Flags used to identify bonds that should be deleted.
 static ble_uuid_t m_adv_uuids[] =                                      /**< Universally unique service identifier. */
     {{BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}};
 
 static volatile bool ble_connected = false;
 static volatile bool ble_notifications_en = false;
 static volatile bool ble_advertising = false;
+
+
+/**@brief Clear bond information from persistent storage.
+ */
+static void delete_bonds(void) {
+    ret_code_t err_code;
+
+    debug_log("erase bonds");
+
+    err_code = pm_peers_delete();
+    APP_ERROR_CHECK(err_code);
+}
+
+/**@brief Function for handling events from bond management service.
+ */
+void bms_evt_handler(nrf_ble_bms_t * p_ess, nrf_ble_bms_evt_t * p_evt) {
+    ret_code_t err_code;
+    bool is_authorized = true;
+
+    switch (p_evt->evt_type) {
+    case NRF_BLE_BMS_EVT_AUTH:
+        debug_log("authorization request");
+        err_code = nrf_ble_bms_auth_response(&m_bms, is_authorized);
+        APP_ERROR_CHECK(err_code);
+    }
+}
+
+uint16_t qwr_evt_handler(nrf_ble_qwr_t * p_qwr, nrf_ble_qwr_evt_t * p_evt) {
+    return nrf_ble_bms_on_qwr_evt(&m_bms, p_qwr, p_evt);
+}
+
+/**@brief Function for deleting a single bond if it does not belong to a connected peer.
+ *
+ * This will mark the bond for deferred deletion if the peer is connected.
+ */
+static void bond_delete(uint16_t conn_handle, void * p_context) {
+    UNUSED_PARAMETER(p_context);
+    ret_code_t   err_code;
+    pm_peer_id_t peer_id;
+
+    if (ble_conn_state_status(conn_handle) == BLE_CONN_STATUS_CONNECTED) {
+        ble_conn_state_user_flag_set(conn_handle, m_bms_bonds_to_delete, true);
+    }
+    else {
+        debug_log("attempting to delete bond");
+        err_code = pm_peer_id_get(conn_handle, &peer_id);
+        APP_ERROR_CHECK(err_code);
+        if (peer_id != PM_PEER_ID_INVALID) {
+            err_code = pm_peer_delete(peer_id);
+            APP_ERROR_CHECK(err_code);
+            ble_conn_state_user_flag_set(conn_handle, m_bms_bonds_to_delete, false);
+        }
+    }
+}
+
+/**@brief Function for performing deferred deletions.
+*/
+static void delete_disconnected_bonds(void) {
+    uint32_t n_calls = ble_conn_state_for_each_set_user_flag(m_bms_bonds_to_delete, bond_delete, NULL);
+    UNUSED_RETURN_VALUE(n_calls);
+}
+
+/**@brief Function for marking the requester's bond for deletion.
+*/
+static void delete_requesting_bond(nrf_ble_bms_t const * p_bms) {
+    debug_log("Client requested that bond to current device deleted");
+    ble_conn_state_user_flag_set(p_bms->conn_handle, m_bms_bonds_to_delete, true);
+}
+
+
+/**@brief Function for deleting all bonds
+*/
+static void delete_all_bonds(nrf_ble_bms_t const * p_bms) {
+    ret_code_t err_code;
+    uint16_t conn_handle;
+
+    debug_log("Client requested that all bonds be deleted");
+
+    pm_peer_id_t peer_id = pm_next_peer_id_get(PM_PEER_ID_INVALID);
+    while (peer_id != PM_PEER_ID_INVALID) {
+        err_code = pm_conn_handle_get(peer_id, &conn_handle);
+        APP_ERROR_CHECK(err_code);
+
+        bond_delete(conn_handle, NULL);
+
+        peer_id = pm_next_peer_id_get(peer_id);
+    }
+}
+
+
+/**@brief Function for deleting all bet requesting device bonds
+*/
+static void delete_all_except_requesting_bond(nrf_ble_bms_t const * p_bms) {
+    ret_code_t err_code;
+    uint16_t conn_handle;
+
+    debug_log("Client requested that all bonds except current bond be deleted");
+
+    pm_peer_id_t peer_id = pm_next_peer_id_get(PM_PEER_ID_INVALID);
+    while (peer_id != PM_PEER_ID_INVALID) {
+        err_code = pm_conn_handle_get(peer_id, &conn_handle);
+        APP_ERROR_CHECK(err_code);
+
+        /* Do nothing if this is our own bond. */
+        if (conn_handle != p_bms->conn_handle) {
+            bond_delete(conn_handle, NULL);
+        }
+
+        peer_id = pm_next_peer_id_get(peer_id);
+    }
+}
 
 /**@brief Function for handling Queued Write Module errors.
  *
@@ -48,6 +167,17 @@ static volatile bool ble_advertising = false;
  * @param[in]   nrf_error   Error code containing information about what went wrong.
  */
 static void nrf_qwr_error_handler(uint32_t nrf_error) {
+    APP_ERROR_HANDLER(nrf_error);
+}
+
+/**@brief Function for handling Service errors.
+ *
+ * @details A pointer to this function will be passed to each service which may need to inform the
+ *          application about an error.
+ *
+ * @param[in]   nrf_error   Error code containing information about what went wrong.
+ */
+static void service_error_handler(uint32_t nrf_error) {
     APP_ERROR_HANDLER(nrf_error);
 }
 
@@ -66,6 +196,9 @@ static int gap_params_init(void) {
     err_code = sd_ble_gap_device_name_set(&sec_mode,
                                           (const uint8_t *)DEVICE_NAME,
                                           strlen(DEVICE_NAME));
+    if (err_code != NRF_SUCCESS) return 1;
+
+    err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_UNKNOWN);
     if (err_code != NRF_SUCCESS) return 1;
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -119,9 +252,11 @@ static void nus_data_handler(ble_nus_evt_t *p_evt) {
 /**@brief Function for initializing services that will be used by the application.
  */
 static int services_init(void) {
-    uint32_t err_code;
-    ble_nus_init_t nus_init;
-    nrf_ble_qwr_init_t qwr_init = {0};
+    uint32_t            err_code;
+    ble_nus_init_t      nus_init;
+    ble_dis_init_t      dis_init;
+    nrf_ble_bms_init_t  bms_init;
+    nrf_ble_qwr_init_t  qwr_init = {0};
 
     // Initialize Queued Write Module.
     qwr_init.error_handler = nrf_qwr_error_handler;
@@ -135,6 +270,38 @@ static int services_init(void) {
     nus_init.data_handler = nus_data_handler;
 
     err_code = ble_nus_init(&m_nus, &nus_init);
+    if (err_code != NRF_SUCCESS) return 1;
+
+    // Initialize Bond Management Service
+    memset(&bms_init, 0, sizeof(bms_init));
+
+    m_bms_bonds_to_delete        = ble_conn_state_user_flag_acquire();
+    bms_init.evt_handler         = bms_evt_handler;
+    bms_init.error_handler       = service_error_handler;
+    bms_init.feature.delete_requesting              = true;
+    bms_init.feature.delete_all                     = true;
+    bms_init.feature.delete_all_but_requesting      = true;
+    bms_init.bms_feature_sec_req = SEC_JUST_WORKS;
+    bms_init.bms_ctrlpt_sec_req  = SEC_JUST_WORKS;
+
+    bms_init.p_qwr                                       = &m_qwr;
+    bms_init.bond_callbacks.delete_requesting            = delete_requesting_bond;
+    bms_init.bond_callbacks.delete_all                   = delete_all_bonds;
+    bms_init.bond_callbacks.delete_all_except_requesting = delete_all_except_requesting_bond;
+
+    err_code = nrf_ble_bms_init(&m_bms, &bms_init);
+    if (err_code != NRF_SUCCESS) return 1;
+
+    // Initialize Device Information Service.
+    // memset(&dis_init, 0, sizeof(dis_init));
+
+    // ble_srv_ascii_to_utf8(&dis_init.manufact_name_str, MANUFACTURER_NAME);
+
+    // dis_init.dis_char_rd_sec = SEC_OPEN;
+
+    // err_code = ble_dis_init(&dis_init);
+    // APP_ERROR_CHECK(err_code);
+
     return (err_code != NRF_SUCCESS) ? 1 : 0;
 }
 
@@ -242,6 +409,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context) {
 
     case BLE_GAP_EVT_DISCONNECTED:
         ble_connected = false;
+        delete_disconnected_bonds();
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         CALLBACK_FUNC(BLE_GAP_EVT_DISCONNECTED)();
         break;
@@ -335,8 +503,59 @@ static int gatt_init(void) {
     err_code = nrf_ble_gatt_init(&m_gatt, gatt_evt_handler);
     if (err_code != NRF_SUCCESS) return 1;
 
-    // err_code = nrf_ble_gatt_att_mtu_periph_set(&m_gatt, NRF_SDH_BLE_GATT_MAX_MTU_SIZE);
-    err_code = nrf_ble_gatt_att_mtu_periph_set(&m_gatt, 100);
+    err_code = nrf_ble_gatt_att_mtu_periph_set(&m_gatt, NRF_SDH_BLE_GATT_MAX_MTU_SIZE);
+    return (err_code != NRF_SUCCESS) ? 1 : 0;
+}
+
+/**@brief Function for handling Peer Manager events.
+ *
+ * @param[in] p_evt  Peer Manager event.
+ */
+static void pm_evt_handler(pm_evt_t const * p_evt) {
+    pm_handler_on_pm_evt(p_evt);
+    pm_handler_disconnect_on_sec_failure(p_evt);
+    pm_handler_flash_clean(p_evt);
+
+    switch (p_evt->evt_id) {
+    case PM_EVT_PEERS_DELETE_SUCCEEDED:
+        advertising_start(false);
+        break;
+
+    default:
+        break;
+    }
+}
+
+
+/**@brief Function for the Peer Manager initialization.
+ */
+static int peer_manager_init(void) {
+    ble_gap_sec_params_t sec_param;
+    ret_code_t err_code;
+
+    err_code = pm_init();
+    if (err_code != NRF_SUCCESS) return 1;
+
+    memset(&sec_param, 0, sizeof(ble_gap_sec_params_t));
+
+    // Security parameters to be used for all security procedures.
+    sec_param.bond           = SEC_PARAM_BOND;
+    sec_param.mitm           = SEC_PARAM_MITM;
+    sec_param.lesc           = SEC_PARAM_LESC;
+    sec_param.keypress       = SEC_PARAM_KEYPRESS;
+    sec_param.io_caps        = SEC_PARAM_IO_CAPABILITIES;
+    sec_param.oob            = SEC_PARAM_OOB;
+    sec_param.min_key_size   = SEC_PARAM_MIN_KEY_SIZE;
+    sec_param.max_key_size   = SEC_PARAM_MAX_KEY_SIZE;
+    sec_param.kdist_own.enc  = 1;
+    sec_param.kdist_own.id   = 1;
+    sec_param.kdist_peer.enc = 1;
+    sec_param.kdist_peer.id  = 1;
+
+    err_code = pm_sec_params_set(&sec_param);
+    if (err_code != NRF_SUCCESS) return 1;
+
+    err_code = pm_register(pm_evt_handler);
     return (err_code != NRF_SUCCESS) ? 1 : 0;
 }
 
@@ -381,6 +600,7 @@ void ble_all_services_init(void) {
          || services_init() 
          || advertising_init() 
          || conn_params_init()  // optional -- this could be disabled if not needed
+         || peer_manager_init()
          ) {
         APP_ERROR_CHECK(NRF_ERROR_INTERNAL);
     }
@@ -389,7 +609,12 @@ void ble_all_services_init(void) {
 /**
  * @brief start advertising. ble stack should be initialized first
  */
-void advertising_start(void) {
+void advertising_start(bool erase_bonds) {
+    if (erase_bonds) {  // Advertising is started by PM_EVT_PEERS_DELETE_SUCCEEDED event.
+        delete_bonds();
+        return;
+    }
+
     if (ble_advertising) return; // already advertising
     debug_log("advertising start");
     uint32_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);

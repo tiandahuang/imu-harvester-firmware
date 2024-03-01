@@ -32,6 +32,10 @@
         "inttypes.h": "c",
         "nrf_sdh.h": "c",
         "ble_hci.h": "c",
-        "nrf_sdh_soc.h": "c"
+        "nrf_sdh_soc.h": "c",
+        "peer_manager_handler.h": "c",
+        "fds.h": "c",
+        "nrf_ble_bms.h": "c",
+        "peer_manager.h": "c"
     }
 }
