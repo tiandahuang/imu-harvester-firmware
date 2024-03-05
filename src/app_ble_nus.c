@@ -39,6 +39,7 @@ NRF_BLE_QWR_DEF(m_qwr);                           /**< Context for the Queued Wr
 BLE_ADVERTISING_DEF(m_advertising);               /**< Advertising module instance. */
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;               /**< Handle of the current connection. */
+static uint8_t m_qwr_mem[QWR_BUFFER_SIZE];                             //!< Write buffer for the Queued Write module.
 static uint16_t m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3; /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 static ble_conn_state_user_flag_id_t m_bms_bonds_to_delete;            //!< Flags used to identify bonds that should be deleted.
 static ble_uuid_t m_adv_uuids[] =                                      /**< Universally unique service identifier. */
@@ -256,10 +257,14 @@ static int services_init(void) {
     ble_nus_init_t      nus_init;
     ble_dis_init_t      dis_init;
     nrf_ble_bms_init_t  bms_init;
-    nrf_ble_qwr_init_t  qwr_init = {0};
+    nrf_ble_qwr_init_t  qwr_init;
 
     // Initialize Queued Write Module.
-    qwr_init.error_handler = nrf_qwr_error_handler;
+    memset(&qwr_init, 0, sizeof(qwr_init));
+    qwr_init.mem_buffer.len   = QWR_BUFFER_SIZE;
+    qwr_init.mem_buffer.p_mem = m_qwr_mem;
+    qwr_init.callback         = qwr_evt_handler;
+    qwr_init.error_handler    = nrf_qwr_error_handler;
 
     err_code = nrf_ble_qwr_init(&m_qwr, &qwr_init);
     if (err_code != NRF_SUCCESS) return 1;
@@ -290,6 +295,8 @@ static int services_init(void) {
     bms_init.bond_callbacks.delete_all_except_requesting = delete_all_except_requesting_bond;
 
     err_code = nrf_ble_bms_init(&m_bms, &bms_init);
+    debug_log("%d", err_code);
+    debug_flush();
     if (err_code != NRF_SUCCESS) return 1;
 
     // Initialize Device Information Service.
@@ -385,8 +392,6 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
 WEAK_CALLBACK_DEF(BLE_GAP_EVT_CONNECTED)
 WEAK_CALLBACK_DEF(BLE_GAP_EVT_DISCONNECTED)
 WEAK_CALLBACK_DEF(BLE_GAP_EVT_PHY_UPDATE_REQUEST)
-WEAK_CALLBACK_DEF(BLE_GAP_EVT_SEC_PARAMS_REQUEST)
-WEAK_CALLBACK_DEF(BLE_GATTS_EVT_SYS_ATTR_MISSING)
 WEAK_CALLBACK_DEF(BLE_GATTC_EVT_TIMEOUT)
 WEAK_CALLBACK_DEF(BLE_GATTS_EVT_TIMEOUT)
 
@@ -397,6 +402,8 @@ WEAK_CALLBACK_DEF(BLE_GATTS_EVT_TIMEOUT)
  */
 static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context) {
     uint32_t err_code;
+
+    pm_handler_secure_on_connection(p_ble_evt);
 
     switch (p_ble_evt->header.evt_id) {
     case BLE_GAP_EVT_CONNECTED:
@@ -424,20 +431,6 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context) {
         APP_ERROR_CHECK(err_code);
         CALLBACK_FUNC(BLE_GAP_EVT_PHY_UPDATE_REQUEST)();
     } break;
-
-    case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
-        // Pairing not supported
-        err_code = sd_ble_gap_sec_params_reply(m_conn_handle, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL);
-        APP_ERROR_CHECK(err_code);
-        CALLBACK_FUNC(BLE_GAP_EVT_SEC_PARAMS_REQUEST)();
-        break;
-
-    case BLE_GATTS_EVT_SYS_ATTR_MISSING:
-        // No system attributes have been stored.
-        err_code = sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0, 0);
-        APP_ERROR_CHECK(err_code);
-        CALLBACK_FUNC(BLE_GATTS_EVT_SYS_ATTR_MISSING)();
-        break;
 
     case BLE_GATTC_EVT_TIMEOUT:
         // Disconnect on GATT Client timeout event.

@@ -6,7 +6,7 @@
 
 
 #ifndef APP_CONFIG_LOG_ENABLED
-#define APP_CONFIG_LOG_ENABLED 0
+#define APP_CONFIG_LOG_ENABLED 1
 #endif
 
 #ifndef VSCODE_EDITING
