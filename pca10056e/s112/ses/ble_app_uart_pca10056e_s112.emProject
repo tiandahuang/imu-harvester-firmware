@@ -104,6 +104,7 @@
       <file file_name="../../../src/app_accelerometer.c" />
       <file file_name="../../../src/app_spi.c" />
       <file file_name="../../../src/bma400.c" />
+      <file file_name="../../../src/app_voltage.c" />
     </folder>
     <folder Name="nRF_Segger_RTT">
       <file file_name="../../../../../../external/segger_rtt/SEGGER_RTT.c" />

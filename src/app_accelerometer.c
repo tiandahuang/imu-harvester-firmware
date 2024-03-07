@@ -49,6 +49,10 @@ struct bma400_dev           bma         = {
         .read_write_len = APP_SPI_MAX_TRANSFER_LEN - 1
 };
 
+// int1 interrupt
+
+nrfx_gpiote_in_config_t int1_config = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
+
 WEAK_CALLBACK_DEF(ACCELEROMETER_DATA_READY)
 
 static void int1_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
@@ -65,11 +69,6 @@ int accelerometer_init(void) {
         debug_flush();
         return -1;
     }
-
-    // set up GPIO interrupts
-    nrfx_gpiote_in_config_t int1_config = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
-    nrfx_gpiote_in_init(IMU_INT1, &int1_config, int1_handler);
-    nrfx_gpiote_in_event_enable(IMU_INT1, true);
 
     /* Select the type of configuration to be modified */
     conf.type = BMA400_ACCEL;
@@ -124,10 +123,18 @@ int accelerometer_init(void) {
 
 void accelerometer_wake(void) {
     bma400_set_power_mode(BMA400_MODE_NORMAL, &bma);
+
+    // set up GPIO interrupts
+    nrfx_gpiote_in_init(IMU_INT1, &int1_config, int1_handler);
+    nrfx_gpiote_in_event_enable(IMU_INT1, true);
 }
 
 void accelerometer_sleep(void) {
     bma400_set_power_mode(BMA400_MODE_SLEEP, &bma);
+
+    // disable GPIO interrupts
+    nrfx_gpiote_in_event_disable(IMU_INT1);
+    nrfx_gpiote_in_uninit(IMU_INT1);
 }
 
 uint16_t accelerometer_fetch_data(void) {

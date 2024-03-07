@@ -32,7 +32,7 @@
 #define POWER_PROFILING_ENABLED 1           // enable power profiling -- runs IMU sample and BLE send on loop
 
 // BLE config
-#define DEVICE_NAME             "test"      // device name in BLE advertising
+#define DEVICE_NAME_DEFAULT     "test"      // device name in BLE advertising
 #define ENABLE_DEVICE_NAME      1           // enable device name in advertising
 
 #define APP_ADV_INTERVAL        MSEC_TO_UNITS(20, UNIT_0_625_MS)    // advertising interval (in units of 0.625 ms)

@@ -1,12 +1,14 @@
 
 #include "app_ble_nus.h"
 #include "app_callbacks.h"
+#include "device_addr_name.h"
 
 #include "ble_advdata.h"
 #include "ble_advertising.h"
 #include "ble_conn_params.h"
 #include "ble_hci.h"
 #include "ble_nus.h"
+#include "ble_gap.h"
 #include "ble_conn_state.h"
 #include "ble_dis.h"
 
@@ -182,6 +184,22 @@ static void service_error_handler(uint32_t nrf_error) {
     APP_ERROR_HANDLER(nrf_error);
 }
 
+static const char * assign_device_name(void) {
+    ble_gap_addr_t dev_addr;
+    sd_ble_gap_addr_get(&dev_addr);
+    uint8_t num_assigned = sizeof(device_name_lookup) / sizeof(*device_name_lookup);
+    static const char default_name[] = DEVICE_NAME_DEFAULT;
+
+    for (uint8_t i = 0; i < sizeof(device_name_lookup) / sizeof(*device_name_lookup); i++) {
+        if (memcmp(device_name_lookup[i].addr.addr, dev_addr.addr, BLE_GAP_ADDR_LEN) == 0) {
+            debug_log("device name assigned: %s", device_name_lookup[i].name);
+            return device_name_lookup[i].name;
+        }
+    }
+    debug_log("device address not recognized. assigning default name.");
+    return default_name;
+}
+
 /**@brief Function for the GAP initialization.
  *
  * @details This function will set up all the necessary GAP (Generic Access Profile) parameters of
@@ -194,9 +212,10 @@ static int gap_params_init(void) {
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
+    const char * dev_name = assign_device_name();
     err_code = sd_ble_gap_device_name_set(&sec_mode,
-                                          (const uint8_t *)DEVICE_NAME,
-                                          strlen(DEVICE_NAME));
+                                          (const uint8_t *)dev_name,
+                                          strlen(dev_name));
     if (err_code != NRF_SUCCESS) return 1;
 
     err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_UNKNOWN);
@@ -295,19 +314,7 @@ static int services_init(void) {
     bms_init.bond_callbacks.delete_all_except_requesting = delete_all_except_requesting_bond;
 
     err_code = nrf_ble_bms_init(&m_bms, &bms_init);
-    debug_log("%d", err_code);
-    debug_flush();
     if (err_code != NRF_SUCCESS) return 1;
-
-    // Initialize Device Information Service.
-    // memset(&dis_init, 0, sizeof(dis_init));
-
-    // ble_srv_ascii_to_utf8(&dis_init.manufact_name_str, MANUFACTURER_NAME);
-
-    // dis_init.dis_char_rd_sec = SEC_OPEN;
-
-    // err_code = ble_dis_init(&dis_init);
-    // APP_ERROR_CHECK(err_code);
 
     return (err_code != NRF_SUCCESS) ? 1 : 0;
 }
@@ -637,8 +644,12 @@ ret_code_t ble_send(uint8_t *data, uint16_t length) {
     }
 
     return ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
-    // ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
-    // sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-    // advertising_stop();
-    // return NRF_SUCCESS;
+}
+
+/**
+ * @brief force a ble disconnection
+ */
+void ble_disconnect(bool stop_advertising) {
+    sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+    if (stop_advertising) advertising_stop();
 }
